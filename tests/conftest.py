@@ -12,6 +12,9 @@ class MockAd:
         self.click_url = "http://click"
         self.status = "pending"
 
+    def dict(self):
+        return self.__dict__
+
 
 class MockAdGroup:
     def __init__(self, id="ag_001"):
@@ -25,6 +28,9 @@ class MockAdGroup:
         }
         self.ads = [MockAd()]
 
+    def dict(self):
+        return self.__dict__
+
 
 class MockCampaignJob:
     def __init__(self):
@@ -35,3 +41,6 @@ class MockCampaignJob:
         self.end_date = "2025-08-15"
         self.objective = "engagement"
         self.ad_groups = [MockAdGroup()]
+
+    def dict(self):
+        return self.__dict__

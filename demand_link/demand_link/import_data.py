@@ -81,7 +81,6 @@ def import_dsp_data(input: str):
                 click_url=i["click_url"],
                 ad_status=i["ad_status"],
             )
-            print("creating campaign object for records object")
 
             list_campaign.append(record)
 
