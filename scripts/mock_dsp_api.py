@@ -1,7 +1,6 @@
 import sys
 from typing import List
 from fastapi import Body, FastAPI, HTTPException
-from pydantic import BaseModel
 from uuid import uuid4
 import random
 import asyncio
@@ -30,38 +29,8 @@ logger.info("API is starting up")
 campaign_db = {}
 
 
-# Model for campaign creation
-class CampaignRequest(BaseModel):
-    id: str
-    name: str
-    budget: float
-    start_date: str
-    end_date: str
-    objective: str
-    ad_groups: List[AdGroup] = []
-
-
-class AdGroupRequest(BaseModel):
-    id: str
-    campaign_id: str
-    name: str
-    bid: float
-    targeting_ages: List
-    targeting_interests: List
-    targeting_geo: List
-    ads: List[Ad] = []
-
-
-class AdRequest(BaseModel):
-    id: str
-    type: str
-    creative_url: str
-    click_url: str
-    status: str
-
-
 @app.post("/campaigns", status_code=202)
-async def create_campaign(data: CampaignRequest = Body(...)):
+async def create_campaign(data: Campaign = Body(...)):
     campaign_id = str(uuid4())
 
     logger.info(f"--> getting requestion: {data}")
@@ -98,7 +67,7 @@ async def get_campaign_status(campaign_id: str):
 
 
 @app.post("/ad-groups")
-async def create_ad_groups(data: AdGroupRequest):
+async def create_ad_groups(data: AdGroup):
 
     logger.info(f"Create ad-groups: status: {data}")
     ad_group = {}
@@ -117,7 +86,7 @@ async def get_ad_groups_status(ad_group_id: str):
 
 
 @app.post("/ads")
-async def create_ad(data: AdRequest):
+async def create_ad(data: Ad):
     logger.info("Create ad status:")
     result = {"ad_id": data.id}
 

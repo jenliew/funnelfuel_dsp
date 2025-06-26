@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import List
 
 
@@ -10,6 +10,9 @@ class Ad:
     click_url: str
     status: str
 
+    def dict(self):
+        return {k: str(v) for k, v in asdict(self).items()}
+
 
 @dataclass
 class AdGroup:
@@ -19,6 +22,9 @@ class AdGroup:
     bid: float
     targeting: dict
     ads: List[Ad] = field(default_factory=list)
+
+    def dict(self):
+        return {k: v for k, v in asdict(self).items()}
 
 
 @dataclass
@@ -30,6 +36,9 @@ class Campaign:
     end_date: str
     objective: str
     ad_groups: List[AdGroup] = field(default_factory=list)
+
+    def dict(self):
+        return {k: v for k, v in asdict(self).items()}
 
 
 @dataclass

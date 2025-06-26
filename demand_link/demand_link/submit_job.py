@@ -5,16 +5,8 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 
 from demand_link.demand_link.constant import RATE_LIMIT, URL_API_STR
+from scripts.mock_dsp_api import AdGroup
 
-
-"""_summary_
-
-Raises:
-    asyncio.InvalidStateError: _description_
-
-Returns:
-    _type_: _description_
-"""
 # TODO: need to handle error condition and retries.
 
 
@@ -26,6 +18,7 @@ class Submission:
     async def _request_with_limiter(self, method, url, **kwargs):
         async with self.rate_limiter:
             async with method(url, **kwargs) as response:
+                print(response.status)
                 text = await response.text()
                 print(f"-> raw_response from {url}: {text}")
                 return json.loads(text)
@@ -52,39 +45,26 @@ class Submission:
         return await self._request_with_limiter(session.post, url, json=data)
 
     async def process_campaign_job(self, session, job):
-        campaign_data = {
-            "id": job.id,
-            "name": job.name,
-            "budget": job.budget,
-            "start_date": job.start_date,
-            "end_date": job.end_date,
-            "objective": job.objective,
-        }
-        campaign_response = await self.post_entity(session, "campaigns", campaign_data)
-        campaign_id = campaign_response.get("campaign_id")
+
+        campaign_response = await self.post_entity(session, "campaigns", job.dict())
+        campaign_id = campaign_response.get("campaign_id", None)
 
         if not campaign_id:
-            print("‼️Error: campaign_id missing")
+            print("Error: campaign_id missing")
             return
 
         if not await self.poll_status(session, "campaigns", campaign_id):
             return
 
         for group in job.ad_groups:
-            await self._submit_ad_group(session, campaign_id, group)
+            # Overwrite campaign_id return by DSP API
+            group.campaing_id = campaign_id
+            await self._submit_ad_group(session, group)
 
-    async def _submit_ad_group(self, session, campaign_id, group):
-        ad_group_data = {
-            "id": group.id,
-            "campaign_id": campaign_id,
-            "name": group.name,
-            "bid": group.bid,
-            "targeting_ages": re.split(";|,", group.targeting["ages"]),
-            "targeting_interests": re.split(";|,", group.targeting["interests"]),
-            "targeting_geo": re.split(";|,", group.targeting["geo"]),
-        }
-        group_response = await self.post_entity(session, "ad-groups", ad_group_data)
-        group_id = group_response.get("ad_group_id")
+    async def _submit_ad_group(self, session, group_data: AdGroup):
+
+        group_response = await self.post_entity(session, "ad-groups", group_data.dict())
+        group_id = group_response.get("ad_group_id", None)
 
         if not group_id:
             raise asyncio.InvalidStateError("Failed to create ad_group")
@@ -92,20 +72,13 @@ class Submission:
         if not await self.poll_status(session, "ad-groups", group_id):
             return
 
-        for ad in group.ads:
+        for ad in group_data.ads:
             await self._submit_ad(session, ad)
 
-    async def _submit_ad(self, session, ad):
-        print(f"-> Uploading ad {ad.id}")
-        ad_data = {
-            "id": ad.id,
-            "type": ad.type,
-            "creative_url": ad.creative_url,
-            "click_url": ad.click_url,
-            "status": ad.status,
-        }
-        ad_response = await self.post_entity(session, "ads", ad_data)
-        ad_id = ad_response.get("ad_id")
+    async def _submit_ad(self, session, ad_data):
+        print(f"-> Uploading ad {ad_data.id}")
+        ad_response = await self.post_entity(session, "ads", ad_data.dict())
+        ad_id = ad_response.get("ad_id", None)
 
         if not ad_id or not await self.poll_status(session, "ads", ad_id):
             return
