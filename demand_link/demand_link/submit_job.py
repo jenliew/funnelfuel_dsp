@@ -1,10 +1,8 @@
 import asyncio
-import json
-from typing import Dict
-import aiohttp
-from aiolimiter import AsyncLimiter
 
-from demand_link.demand_link.constant import API_REQUEST, RATE_LIMIT, URL_API_STR
+from demand_link.demand_link.constant import (
+    MAX_RETRIES,
+)
 from demand_link.demand_link.exception import SubmissionError
 from demand_link.demand_link.notifier import Notifier
 from scripts.mock_dsp_api import AdGroup
@@ -67,7 +65,16 @@ class Submission:
                 await self.process_campaign_job(job)
             except SubmissionError as e:
                 print(f"⚠️ Exception: {e}")
-                raise SubmissionError(f"Failed process job error:{e}")
+
+                if job.retries == MAX_RETRIES:
+                    raise SubmissionError(f"Failed process job error:{e}")
+                else:
+                    job.retries += 1
+                    await asyncio.sleep(1)  # small backoff before retry
+
+                    await queue.put(job)
+                    print("Attempting retries {retries}".format(retries=job.retries))
+
             finally:
                 print("✅ Job complete")
                 queue.task_done()

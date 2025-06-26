@@ -4,6 +4,16 @@ import pytest
 from demand_link.demand_link.submit_job import Submission
 
 
+@pytest.fixture
+def submission():
+    return Submission()
+
+
+@pytest.fixture
+def queue():
+    return asyncio.Queue()
+
+
 class MockAd:
     def __init__(self, id="ad_001", type="banner"):
         self.id = id
@@ -41,6 +51,7 @@ class MockCampaignJob:
         self.end_date = "2025-08-15"
         self.objective = "engagement"
         self.ad_groups = [MockAdGroup()]
+        self.retries = 0
 
     def dict(self):
         return self.__dict__

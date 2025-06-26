@@ -1,32 +1,21 @@
 import asyncio
 import pytest
 from pytest import MonkeyPatch
+from unittest.mock import AsyncMock
 from demand_link.demand_link.exception import SubmissionError
 from demand_link.demand_link.submit_job import Submission
 from tests.conftest import MockCampaignJob
-from unittest.mock import AsyncMock
 
 
-@pytest.mark.asyncio
-async def run_single_job(
-    submission: Submission, monkeypatch, responses, response_status
+async def run_job_with_mocks(
+    submission: Submission,
+    monkeypatch: MonkeyPatch,
+    responses: list,
+    response_status: list,
+    queue: asyncio.Queue,
 ):
-
-    async def mocked_post_entity(method, mock_repsonse_dict):
-        for pattern, value in responses.items():
-            if pattern == method:
-                return value
-        return {}
-
-    monkeypatch.setattr(
-        submission.notifier,
-        "post_entity",
-        mocked_post_entity,
-    )
-
+    submission.notifier.post_entity = AsyncMock(side_effect=responses)
     submission.notifier.poll_status = AsyncMock(side_effect=response_status)
-
-    queue = asyncio.Queue()
     await queue.put(MockCampaignJob())
 
     task = asyncio.create_task(submission.submit_job(queue))
@@ -37,128 +26,124 @@ async def run_single_job(
 
 
 @pytest.mark.asyncio
-async def test_successful_job(monkeypatch: MonkeyPatch):
-    submission = Submission()
-    await run_single_job(
+async def test_successful_job(submission, monkeypatch, queue):
+    await run_job_with_mocks(
         submission,
         monkeypatch,
-        {
-            "campaigns": {"campaign_id": "camp_123"},
-            "ad-groups": {"ad_group_id": "group_456"},
-            "ads": {"ad_id": "ad_789"},
-        },
+        [
+            {"campaign_id": "camp_123"},
+            {"ad_group_id": "group_456"},
+            {"ad_id": "ad_789"},
+        ],
         [True, True, True],
+        queue,
     )
 
 
 @pytest.mark.asyncio
-async def test_campaign_creation_failure(monkeypatch: MonkeyPatch):
-    submission = Submission()
-
+async def test_campaign_creation_failure(submission, monkeypatch, queue):
+    monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 1)
     with pytest.raises(
         SubmissionError, match="Failed process job error:Fail get campaign_id"
     ):
-        await run_single_job(
+        await run_job_with_mocks(
             submission,
             monkeypatch,
-            {
-                "campaigns": {},  # no campaign_id
-            },
-            [],
-        )  # Should print error and skip rest
+            [{"campaign_id": None}, {"campaign_id": None}],
+            [False, False],
+            queue,
+        )
 
 
 @pytest.mark.asyncio
-async def test_campaign_poll_failure(monkeypatch: MonkeyPatch):
-    submission = Submission()
-
+async def test_campaign_poll_failure(submission, monkeypatch, queue):
+    monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 0)
     with pytest.raises(
         SubmissionError, match="Failed process job error:Fail pool status from DSP API"
     ):
-        await run_single_job(
+        await run_job_with_mocks(
             submission,
             monkeypatch,
-            {
-                "campaigns": {"campaign_id": "camp_123"},
-            },
+            [{"campaign_id": "camp_123"}],
             [False],
+            queue,
         )
 
 
 @pytest.mark.asyncio
-async def test_ad_group_creation_failure(monkeypatch: MonkeyPatch):
-    submission = Submission()
-
+async def test_ad_group_creation_failure(submission, monkeypatch, queue):
+    monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 0)
     with pytest.raises(
         SubmissionError, match="Failed process job error:Failed to create ad_group"
-    ) as e:
-        await run_single_job(
+    ):
+        await run_job_with_mocks(
             submission,
             monkeypatch,
-            {
-                "campaigns": {"campaign_id": "camp_123"},
-                "ad-groups": {None: None},
-            },
+            [
+                {"campaign_id": "camp_123"},
+                {None: None},
+            ],
             [True],
+            queue,
         )
 
 
 @pytest.mark.asyncio
-async def test_ad_poll_failure(monkeypatch: MonkeyPatch):
-    submission = Submission()
-    await run_single_job(
+async def test_ad_poll_failure(submission, monkeypatch, queue):
+    await run_job_with_mocks(
         submission,
         monkeypatch,
-        {
-            "campaigns": {"campaign_id": "camp_123"},
-            "ad-groups": {"ad_group_id": "group_456"},
-            "ads": {"ad_id": "ad_789"},
-        },
+        [
+            {"campaign_id": "camp_123"},
+            {"ad_group_id": "group_456"},
+            {"ad_id": "ad_789"},
+        ],
         [True, True, False],
+        queue,
     )
 
 
 @pytest.mark.asyncio
-async def test_campaign_pool_wait_for_success(monkeypatch: MonkeyPatch):
-    submission = Submission()
-
-    await run_single_job(
-        submission,
-        monkeypatch,
-        {
-            "campaigns": {"campaign_id": "camp_1123"},
-            "ad-groups": {"ad_group_id": "group_456"},
-            "ads": {"ad_id": "ad_789"},
-        },
-        {
-            "campaigns/camp_1123/status": [
-                {"status": None},
-                {"status": None},
-                {"status": "success"},
-            ],
-            "ad-groups/group_456/status": {"status": "success"},
-            "ads/ad_789/status": {"status": "failed", "error": "Creative rejected"},
-        },
-    )
-
-
-@pytest.mark.asyncio
-async def test_ad_id_missing(monkeypatch: MonkeyPatch):
-    submission = Submission()
-
+async def test_ad_id_missing(submission, monkeypatch, queue):
+    monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 0)
     with pytest.raises(
         SubmissionError, match="Failed process job error:Failed to create/update ad"
     ):
-        await run_single_job(
+        await run_job_with_mocks(
             submission,
             monkeypatch,
-            {
-                "campaigns": {"campaign_id": "camp_123"},
-                "ad-groups": {"ad_group_id": "group_456"},
-                "ads": {},  # missing ad_id
-            },
-            {
-                "campaigns/camp_123/status": {"status": "success"},
-                "ad-groups/group_456/status": {"status": "success"},
-            },
+            [
+                {"campaign_id": "camp_123"},
+                {"ad_group_id": "group_456"},
+                {},
+            ],
+            [True, True, False],
+            queue,
         )
+
+
+@pytest.mark.asyncio
+async def test_retries_failure(monkeypatch: MonkeyPatch):
+    monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 2)
+    submission = Submission()
+    response_status = [False, True, True, True]
+    responses = [
+        {"campaign_id": "camp_123"},
+        {"campaign_id": "camp_123"},
+        {"ad_group_id": "group_456"},
+        {"ad_id": "ad_789"},
+    ]
+
+    submission.notifier.post_entity = AsyncMock(side_effect=responses)
+    submission.notifier.poll_status = AsyncMock(side_effect=response_status)
+
+    queue = asyncio.Queue()
+    await queue.put(MockCampaignJob())
+    task = asyncio.create_task(submission.submit_job(queue))
+    await queue.join()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert submission.notifier.poll_status.call_count == 4

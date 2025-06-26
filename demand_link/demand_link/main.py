@@ -1,9 +1,5 @@
-import sys
-
-print(sys.path)
 from demand_link.demand_link.import_data import import_dsp_data
 from demand_link.demand_link.submit_job import Submission
-
 
 from asyncio import Queue
 import asyncio

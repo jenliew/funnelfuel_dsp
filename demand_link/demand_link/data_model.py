@@ -36,7 +36,7 @@ class Campaign:
     end_date: str
     objective: str
     ad_groups: List[AdGroup] = field(default_factory=list)
-    submission: int = 0
+    retries: int = 0
 
     def dict(self):
         return {k: v for k, v in asdict(self).items()}
