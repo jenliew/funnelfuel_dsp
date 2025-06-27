@@ -1,21 +1,29 @@
 import asyncio
+import logging
+
+from scripts.mock_dsp_api import AdGroup
 
 from demand_link.demand_link.constant import (
+    DEFAULT_RATE_LIMIT,
+    DEFAULT_URL_API_STR,
     MAX_RETRIES,
 )
 from demand_link.demand_link.exception import SubmissionError
 from demand_link.demand_link.notifier import Notifier
-from scripts.mock_dsp_api import AdGroup
 
-# TODO: need to handle error condition and retries.
+logger = logging.getLogger(__name__)
 
 
 class Submission:
-    def __init__(self) -> None:
-        self.notifier = Notifier()
+    def __init__(
+        self, dsp_endpoint=DEFAULT_URL_API_STR, rate_limit=DEFAULT_RATE_LIMIT
+    ) -> None:
+        self.notifier = Notifier(dsp_endpoint, rate_limit)
 
     async def process_campaign_job(self, job):
-        campaign_response = await self.notifier.post_entity("campaigns", job.dict())
+        campaign_response = await self.notifier.post_entity(
+            "campaigns", job.dict()
+        )
         campaign_id = campaign_response.get("campaign_id", None)
 
         if not campaign_id:
@@ -31,8 +39,9 @@ class Submission:
             await self._submit_ad_group(group)
 
     async def _submit_ad_group(self, group_data: AdGroup):
-
-        group_response = await self.notifier.post_entity("ad-groups", group_data.dict())
+        group_response = await self.notifier.post_entity(
+            "ad-groups", group_data.dict()
+        )
         group_id = group_response.get("ad_group_id", None)
 
         if not group_id:
@@ -45,7 +54,7 @@ class Submission:
             await self._submit_ad(ad)
 
     async def _submit_ad(self, ad_data):
-        print(f"-> Uploading ad {ad_data.id}")
+        logger.info(f"-> Uploading ad {ad_data.id}")
         ad_response = await self.notifier.post_entity("ads", ad_data.dict())
         ad_id = ad_response.get("ad_id", None)
 
@@ -56,25 +65,32 @@ class Submission:
             return SubmissionError("Fail pool status from DSP API")
 
     async def submit_job(self, queue: asyncio.Queue):
-        print("🚀 Starting DSP job submissions")
+        logging.info("🚀 Starting DSP job submissions")
 
         while True:
             job = await queue.get()
             try:
-                print("🛠️ Processing campaign job...")
+                logging.info("🛠️ Processing campaign job...")
                 await self.process_campaign_job(job)
             except SubmissionError as e:
-                print(f"⚠️ Exception: {e}")
+                logging.error(f"⚠️ Exception: {e}")
+                if job.retries >= MAX_RETRIES:
+                    logging.error(
+                        f"❌ Dropping job {job.id} after {MAX_RETRIES} retries"
+                    )
+                    queue.task_done()  # mark it as done — we give up
 
-                if job.retries == MAX_RETRIES:
-                    raise SubmissionError(f"Failed process job error:{e}")
                 else:
                     job.retries += 1
-                    await asyncio.sleep(1)  # small backoff before retry
-
+                    logging.info(
+                        f"🔁 Attempting retry {job.retries} for job {job.id}"
+                    )
+                    await asyncio.sleep(2)
                     await queue.put(job)
-                    print("Attempting retries {retries}".format(retries=job.retries))
-
-            finally:
-                print("✅ Job complete")
+                    queue.task_done()  # mark current attempt as complete
+            else:
+                logging.info(
+                    f"✅ Job {job.id} completed successfully"
+                    f"after {job.retries} retries"
+                )
                 queue.task_done()

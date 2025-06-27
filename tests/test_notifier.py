@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock
+
 import pytest
 
 from demand_link.demand_link.notifier import Notifier
@@ -10,7 +11,9 @@ async def test_poll_status_success(monkeypatch):
 
     # Mock _request_with_limiter to return success immediately
     monkeypatch.setattr(
-        notifier, "request_with_limiter", AsyncMock(return_value={"status": "success"})
+        notifier,
+        "request_with_limiter",
+        AsyncMock(return_value={"status": "success"}),
     )
 
     result = await notifier.poll_status("campaigns", "abc123")
@@ -50,7 +53,9 @@ async def test_poll_status_failure(monkeypatch):
     monkeypatch.setattr(
         notifier,
         "request_with_limiter",
-        AsyncMock(return_value={"status": "failed", "error": "Something went wrong"}),
+        AsyncMock(
+            return_value={"status": "failed", "error": "Something went wrong"}
+        ),
     )
 
     result = await notifier.poll_status("ads", "xyz789")

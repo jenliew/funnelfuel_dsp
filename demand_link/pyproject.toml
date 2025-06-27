@@ -16,7 +16,18 @@ pytest-asyncio = "^1.0.0"
 aioresponses = "^0.7.8"
 
 
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.2.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+
+[tool.black]
+line-length = 79
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3

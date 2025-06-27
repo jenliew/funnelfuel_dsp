@@ -1,20 +1,20 @@
-import sys
-from typing import List
-from fastapi import Body, FastAPI, HTTPException
-from uuid import uuid4
-import random
 import asyncio
+import logging
+import random
+import sys
+from uuid import uuid4
+
+from fastapi import Body, FastAPI, HTTPException
 
 from demand_link.demand_link.data_model import Ad, AdGroup, Campaign
-
-import logging
 
 app = FastAPI()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter(
-    "%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s"
+    "%(asctime)s [%(processName)s: %(process)d] "
+    "[%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s"
 )
 
 stream_handler = logging.StreamHandler(sys.stdout)
@@ -68,7 +68,6 @@ async def get_campaign_status(campaign_id: str):
 
 @app.post("/ad-groups")
 async def create_ad_groups(data: AdGroup):
-
     logger.info(f"Create ad-groups: status: {data}")
     ad_group = {}
     ad_group[data.id] = data.id

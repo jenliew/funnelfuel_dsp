@@ -1,6 +1,7 @@
 import csv
 
 # Sample merged data
+creative_url_str = "https://cdn.example.com/creatives/summer_style_urban.jpg"
 data = [
     {
         "campaign_id": "cmp_2025_001",
@@ -21,7 +22,7 @@ data = [
                     {
                         "id": "ad_5001",
                         "type": "banner",
-                        "creative_url": "https://cdn.example.com/creatives/summer_style_urban.jpg",
+                        "creative_url": creative_url_str,
                         "click_url": "https://shop.example.com/urban-summer",
                         "status": "pending",
                     }
@@ -48,8 +49,11 @@ data = [
                     {
                         "id": "ad_5002",
                         "type": "video",
-                        "creative_url": "https://cdn.example.com/videos/urban_sizzle.mp4",
-                        "click_url": "https://shop.example.com/urban-summer",
+                        "creative_url": (
+                            "https://cdn.example.com/"
+                            "videos/urban_sizzle.mp4"
+                        ),
+                        "click_url": ("https://shop.example.com/urban-summer"),
                         "status": "pending",
                     }
                 ],
@@ -75,7 +79,10 @@ data = [
                     {
                         "id": "ad_5003",
                         "type": "native",
-                        "creative_url": "https://cdn.example.com/creatives/back_to_school_native.jpg",
+                        "creative_url": (
+                            "https://cdn.example.com/creatives/"
+                            "back_to_school_native.jpg"
+                        ),
                         "click_url": "https://shop.example.com/back-to-school",
                         "status": "pending",
                     }
@@ -83,7 +90,6 @@ data = [
             }
         ],
     },
-    ##New
     {
         "campaign_id": "cmp_2025_004",
         "campaign_name": "Autumn Styles 2024",
@@ -103,7 +109,10 @@ data = [
                     {
                         "id": "ad_6001",
                         "type": "video",
-                        "creative_url": "https://cdn.example.com/creatives/autumn_style_city.jpg",
+                        "creative_url": (
+                            "https://cdn.example.com/creatives"
+                            "/autumn_style_city.jpg"
+                        ),
                         "click_url": "https://shop.example.com/city-autumn",
                         "status": "new",
                     }
@@ -130,7 +139,10 @@ data = [
                     {
                         "id": "ad_6002",
                         "type": "ctv",
-                        "creative_url": "https://cdn.example.com/creatives/autumn_style_urban.jpg",
+                        "creative_url": (
+                            "https://cdn.example.com/creatives/"
+                            "autumn_style_urban.jpg"
+                        ),
                         "click_url": "https://shop.example.com/urban-autumn",
                         "status": "pending",
                     }
@@ -157,15 +169,25 @@ data = [
                     {
                         "id": "ad_9001",
                         "type": "banner",
-                        "creative_url": "https://cdn.example.com/banners/millennials_banner.jpg",
-                        "click_url": "https://shop.example.com/autumn-millennials",
+                        "creative_url": (
+                            "https://cdn.example.com/banners/"
+                            "millennials_banner.jpg"
+                        ),
+                        "click_url": (
+                            "https://shop.example.com/autumn-millennials"
+                        ),
                         "status": "pending",
                     },
                     {
                         "id": "ad_9002",
                         "type": "video",
-                        "creative_url": "https://cdn.example.com/videos/millennials_ad.mp4",
-                        "click_url": "https://shop.example.com/autumn-millennials",
+                        "creative_url": (
+                            "https://cdn.example.com/videos/"
+                            "millennials_ad.mp4"
+                        ),
+                        "click_url": (
+                            "https://shop.example.com/autumn-millennials"
+                        ),
                         "status": "pending",
                     },
                 ],
@@ -181,8 +203,13 @@ data = [
                     {
                         "id": "ad_9003",
                         "type": "native",
-                        "creative_url": "https://cdn.example.com/native/family_savings_native.jpg",
-                        "click_url": "https://shop.example.com/family-autumn-deals",
+                        "creative_url": (
+                            "https://cdn.example.com/native/"
+                            "family_savings_native.jpg"
+                        ),
+                        "click_url": (
+                            "https://shop.example.com/family-autumn-deals"
+                        ),
                         "status": "pending",
                     }
                 ],
@@ -198,8 +225,11 @@ data = [
                     {
                         "id": "ad_9004",
                         "type": "carousel",
-                        "creative_url": "https://cdn.example.com/carousel/back_to_uni_set.jpg",
-                        "click_url": "https://shop.example.com/campus-sale",
+                        "creative_url": (
+                            "https://cdn.example.com/carousel/"
+                            "back_to_uni_set.jpg"
+                        ),
+                        "click_url": ("https://shop.example.com/campus-sale"),
                         "status": "pending",
                     }
                 ],
