@@ -65,32 +65,42 @@ class Submission:
             return SubmissionError("Fail pool status from DSP API")
 
     async def submit_job(self, queue: asyncio.Queue):
-        logging.info("🚀 Starting DSP job submissions")
+        logger.info("🚀 Starting DSP job submissions")
 
         while True:
             job = await queue.get()
             try:
-                logging.info("🛠️ Processing campaign job...")
+                logger.info("🛠️ Processing campaign job...")
                 await self.process_campaign_job(job)
             except SubmissionError as e:
-                logging.error(f"⚠️ Exception: {e}")
+                logger.error(f"⚠️ Exception: {e}")
                 if job.retries >= MAX_RETRIES:
-                    logging.error(
+                    logger.error(
                         f"❌ Dropping job {job.id} after {MAX_RETRIES} retries"
                     )
+
+                    await self.complete_task(False, job.id)
+
                     queue.task_done()  # mark it as done — we give up
 
                 else:
                     job.retries += 1
-                    logging.info(
+                    logger.info(
                         f"🔁 Attempting retry {job.retries} for job {job.id}"
                     )
                     await asyncio.sleep(2)
                     await queue.put(job)
                     queue.task_done()  # mark current attempt as complete
             else:
-                logging.info(
+                logger.info(
                     f"✅ Job {job.id} completed successfully"
                     f"after {job.retries} retries"
                 )
+                await self.complete_task(True, job.id)
                 queue.task_done()
+
+    async def complete_task(self, is_success, job_id):
+
+        logger.info(f"The submission job {job_id} is completed {is_success}.")
+        # THis function can be extend to upload the auditlog or any
+        # update the status..

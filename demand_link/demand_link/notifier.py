@@ -35,9 +35,9 @@ class Notifier:
                 async with api_method(
                     url, timeout=HTTP_TIMEOUT, **kwargs
                 ) as response:
-                    logging.debug(response.status)
+                    logger.debug(response.status)
                     text = await response.text()
-                    logging.info(f"-> raw_response from {url}: {text}")
+                    logger.info(f"-> raw_response from {url}: {text}")
                     return json.loads(text)
 
     async def poll_status(self, entity_type: str, entity_id: str):
@@ -50,12 +50,12 @@ class Notifier:
 
                     entity_type_str = entity_type.capitalize()
                     if status == "success":
-                        logging.info(
+                        logger.info(
                             f"{entity_type_str} {entity_id} succeeded."
                         )
                         return True
                     elif status == "failed":
-                        logging.info(
+                        logger.info(
                             f"{entity_type_str} {entity_id} "
                             f" failed: {data.get('error')}"
                         )

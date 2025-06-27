@@ -97,7 +97,7 @@ class Record:
                 f"Not found ad_groups_id {ad_groups_id} in campaign data"
             )
         else:
-            logger.info(f"-> ads_dict:{ads_dict}")
+            logger.debug(f"-> ads_dict:{ads_dict}")
             existing_ad_groups.ads.append(
                 Ad(
                     id=ads_dict["id"],
