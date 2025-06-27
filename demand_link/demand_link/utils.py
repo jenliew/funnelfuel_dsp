@@ -26,14 +26,14 @@ def convert_str_dsp_record(record, input_data):
     record.add_campaign_record(campaign_dict)
     if not ad_groups_dict_list:
 
-        for k, v in input_data.items():
-            for key, mapped_key in AD_GROUP_KEY_MAPPING.items():
-                if key in k:
-                    grouped_ad_group_data[mapped_key] = v
+        for key, value in input_data.items():
+            for ag_key, ag_mapped_key in AD_GROUP_KEY_MAPPING.items():
+                if ag_key in key:
+                    grouped_ad_group_data[ag_mapped_key] = value
 
             for ad_key, ad_mapped_key in ADS_KEY_MAPPING.items():
-                if ad_key in k:
-                    ads_group_data[ad_mapped_key] = v
+                if ad_key in key:
+                    ads_group_data[ad_mapped_key] = value
 
         ads_dict_list.append(ads_group_data)
         grouped_ad_group_data["ads"] = ads_dict_list

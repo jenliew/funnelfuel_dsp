@@ -15,11 +15,12 @@ from demand_link.demand_link.constant import (
     DEFAULT_WORKER_NUM,
     HTTP_TIMEOUT,
 )
-from demand_link.demand_link.import_data import (
-    convert_str_dsp_record,
-)
+from demand_link.demand_link.exception import SubmissionError
 from demand_link.demand_link.record import Record
 from demand_link.demand_link.submit_job import Submission
+from demand_link.demand_link.utils import (
+    convert_str_dsp_record,
+)
 
 
 async def parse_campaign_job(list_campaign, endpoint, rate_limit, worker_num):
@@ -51,7 +52,10 @@ async def parse_campaign_job(list_campaign, endpoint, rate_limit, worker_num):
 def configure_logging(log_level: str):
     logging.basicConfig(
         level=getattr(logging, log_level.upper(), logging.INFO),
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        format=(
+            "%(asctime)s - %(levelname)s - %(threadName)s "
+            "- %(name)s - %(message)s"
+        ),
     )
     return logging.getLogger("dsp_submission")
 
@@ -63,7 +67,10 @@ def process_file_input(file_path: str, record, logger):
 
     with open(file_path) as input_obj:
         for row in DictReader(input_obj):
-            convert_str_dsp_record(record, row)
+            try:
+                convert_str_dsp_record(record, row)
+            except SubmissionError as e:
+                raise e
 
 
 def process_line_input(line_str: str, record):
@@ -72,6 +79,8 @@ def process_line_input(line_str: str, record):
         convert_str_dsp_record(record, data)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON input for --line: {e}")
+    except SubmissionError as e:
+        raise e
 
 
 def main():
@@ -91,6 +100,11 @@ def main():
             "Missing --file or --line argument. No campaign data provided."
         )
         return
+
+    logger.info(
+        "Successsfully process input data. Preparing "
+        "to submit the jobs to the queue."
+    )
 
     if record.campaign_record:
         asyncio.run(

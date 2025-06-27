@@ -44,9 +44,9 @@ class Notifier:
                     url,
                     **kwargs,
                 ) as response:
-                    logger.debug(response.status)
+                    logger.debug(f"Response received:{response.status}")
                     text = await response.text()
-                    logger.info(f"-> raw_response from {url}: {text}")
+                    logger.info(f"Raw response from {url}: {text}")
                     return json.loads(text)
 
             except aiohttp.ClientResponseError as e:
@@ -69,6 +69,7 @@ class Notifier:
                 raise SubmissionError(f"Unexpected error: {e}")
 
     async def poll_status(self, entity_type: str, entity_id: str):
+
         try:
             retries = 0
             url = f"{self.api_url}/{entity_type}/{entity_id}/status"
@@ -80,17 +81,19 @@ class Notifier:
                     entity_type_str = entity_type.capitalize()
                     if status == "success":
                         logger.info(
-                            f"{entity_type_str} {entity_id} succeeded."
+                            f"Poll status - {entity_type_str} {entity_id} "
+                            f"succeeded."
                         )
                         return True
                     elif status == "failed":
                         logger.info(
-                            f"{entity_type_str} {entity_id} "
+                            f"Poll status - {entity_type_str} {entity_id} "
                             f" failed: {data.get('error')}"
                         )
                         return False
                 retries += 1
                 await asyncio.sleep(2)
+
         except aiohttp.ServerTimeoutError as e:
             raise SubmissionError(f"DSP Server connection timeout:{e}")
         except aiohttp.ClientConnectionError as e:
@@ -105,7 +108,3 @@ class Notifier:
             )
         except aiohttp.ClientConnectionError as e:
             raise SubmissionError(f"ClientConnection exception: {e}")
-
-    async def cleanup(self):
-        if self._http_session:
-            await self._http_session.close()

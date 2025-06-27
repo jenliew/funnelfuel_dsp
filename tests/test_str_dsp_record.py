@@ -1,7 +1,7 @@
 import pytest
 
-from demand_link.demand_link.import_data import convert_str_dsp_record
 from demand_link.demand_link.record import Record
+from demand_link.demand_link.utils import convert_str_dsp_record
 
 
 @pytest.mark.parametrize(

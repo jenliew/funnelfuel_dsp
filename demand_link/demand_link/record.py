@@ -16,8 +16,7 @@ class Record:
         for record in self.campaign_record:
             if record.id == campaign_id:
                 return record
-            else:
-                logger.warning(f"Not found campaign_id:{campaign_id}")
+
         return None
 
     def add_campaign_record(self, data):
@@ -75,13 +74,12 @@ class Record:
             campaign_record.ad_groups.append(existing_ad_group)
         else:
             logger.info(
-                f"Ad_Group:{ad_group_id} existed in the campaign data."
+                f"Ad_Group_Id:{ad_group_id} existed in the campaign data."
             )
 
         for ads_group in campaign_record.ad_groups:
             if ad_group_id == ads_group.id:
-                ad_list = ad_group_dict.get("ads", [])
-                for ad in ad_list:
+                for ad in ad_group_dict.get("ads", []):
                     self.campaign_ads_list(campaign_id, ad_group_id, ad)
 
     def campaign_ads_list(
@@ -97,7 +95,7 @@ class Record:
                 f"Not found ad_groups_id {ad_groups_id} in campaign data"
             )
         else:
-            logger.debug(f"-> ads_dict:{ads_dict}")
+            logger.debug(f"Adding ads item into ads list:{ads_dict}")
             existing_ad_groups.ads.append(
                 Ad(
                     id=ads_dict["id"],
