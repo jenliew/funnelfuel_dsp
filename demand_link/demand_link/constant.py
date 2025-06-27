@@ -3,9 +3,9 @@ from enum import Enum
 DEFAULT_RATE_LIMIT = 40  # Max requests per minute
 DEFAULT_URL_API_STR = "127.0.0.1:8000"
 MAX_RETRIES = 3
-HTTP_TIMEOUT = 30  # Timeout 30 seconds
+HTTP_TIMEOUT = 120  # Timeout 30 seconds
 DEFAULT_WORKER_NUM = 3
-
+MAX_RETRIES_POLL = 20
 # Fields at the campaign level
 CAMPAIGN_KEYS = {
     "campaign_id",

@@ -10,7 +10,7 @@ from demand_link.demand_link.constant import (
     API_REQUEST,
     DEFAULT_RATE_LIMIT,
     DEFAULT_URL_API_STR,
-    HTTP_TIMEOUT,
+    MAX_RETRIES_POLL,
 )
 from demand_link.demand_link.exception import SubmissionError
 
@@ -19,31 +19,60 @@ logger = logging.getLogger(__name__)
 
 class Notifier:
     def __init__(
-        self, endpoint=DEFAULT_URL_API_STR, rate_limit=DEFAULT_RATE_LIMIT
+        self,
+        session,
+        endpoint=DEFAULT_URL_API_STR,
+        rate_limit=DEFAULT_RATE_LIMIT,
     ) -> None:
         self.api_url = f"http://{endpoint}"
         self.rate_limiter = AsyncLimiter(rate_limit, 60)
+
+        self._http_session = session
 
     async def request_with_limiter(
         self, method: API_REQUEST, url: str, **kwargs
     ):
         async with self.rate_limiter:
-            async with aiohttp.ClientSession() as session:
+            try:
+                # async with self._http_session as session:
                 api_method = (
-                    session.post if method == API_REQUEST.POST else session.get
+                    self._http_session.post
+                    if method == API_REQUEST.POST
+                    else self._http_session.get
                 )
                 async with api_method(
-                    url, timeout=HTTP_TIMEOUT, **kwargs
+                    url,
+                    **kwargs,
                 ) as response:
                     logger.debug(response.status)
                     text = await response.text()
                     logger.info(f"-> raw_response from {url}: {text}")
                     return json.loads(text)
 
+            except aiohttp.ClientResponseError as e:
+                logger.error(f"ClientResponse Error: {e}")
+                raise SubmissionError(f"ClientRespons Error:{e}")
+            except aiohttp.ClientConnectionError as e:
+                logger.error(f" Connection error: {e}")
+                raise SubmissionError(f"ClientConnection error: {e}")
+
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout reached for request to {url}")
+                raise SubmissionError(f"Request to {url} timed out")
+
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse JSON from {url}")
+                raise SubmissionError(f"Invalid JSON response from {url}")
+
+            except Exception as e:
+                logger.exception("Unexpected error during request")
+                raise SubmissionError(f"Unexpected error: {e}")
+
     async def poll_status(self, entity_type: str, entity_id: str):
         try:
+            retries = 0
             url = f"{self.api_url}/{entity_type}/{entity_id}/status"
-            while True:
+            while retries <= MAX_RETRIES_POLL:
                 data = await self.request_with_limiter(API_REQUEST.GET, url)
                 if data:
                     status = data.get("status", None)
@@ -60,8 +89,10 @@ class Notifier:
                             f" failed: {data.get('error')}"
                         )
                         return False
-
+                retries += 1
                 await asyncio.sleep(2)
+        except aiohttp.ServerTimeoutError as e:
+            raise SubmissionError(f"DSP Server connection timeout:{e}")
         except aiohttp.ClientConnectionError as e:
             raise SubmissionError(f"ClientConnection exception: {e}")
 
@@ -74,3 +105,7 @@ class Notifier:
             )
         except aiohttp.ClientConnectionError as e:
             raise SubmissionError(f"ClientConnection exception: {e}")
+
+    async def cleanup(self):
+        if self._http_session:
+            await self._http_session.close()

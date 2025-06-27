@@ -7,10 +7,13 @@ import traceback
 from asyncio import Queue
 from csv import DictReader
 
+import aiohttp
+
 from demand_link.demand_link.constant import (
     DEFAULT_RATE_LIMIT,
     DEFAULT_URL_API_STR,
     DEFAULT_WORKER_NUM,
+    HTTP_TIMEOUT,
 )
 from demand_link.demand_link.import_data import (
     convert_str_dsp_record,
@@ -24,17 +27,25 @@ async def parse_campaign_job(list_campaign, endpoint, rate_limit, worker_num):
     for campaign in list_campaign:
         await queue.put(campaign)
 
-    job_submission = Submission(dsp_endpoint=endpoint, rate_limit=rate_limit)
+    logging.info("Creating session.")
+    client_timeout = aiohttp.ClientTimeout(
+        total=None, sock_connect=HTTP_TIMEOUT, sock_read=HTTP_TIMEOUT
+    )
+    async with aiohttp.ClientSession(timeout=client_timeout) as session:
 
-    workers = [
-        asyncio.create_task(job_submission.submit_job(queue))
-        for _ in range(worker_num)
-    ]  # worker_num workers
+        job_submission = Submission(
+            session, dsp_endpoint=endpoint, rate_limit=rate_limit
+        )
 
-    await queue.join()
+        workers = [
+            asyncio.create_task(job_submission.submit_job(queue))
+            for _ in range(worker_num)
+        ]  # worker_num workers
 
-    for w in workers:
-        w.cancel()
+        await queue.join()
+
+        for w in workers:
+            w.cancel()
 
 
 def configure_logging(log_level: str):

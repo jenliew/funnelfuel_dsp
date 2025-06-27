@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -6,8 +7,18 @@ from demand_link.demand_link.submit_job import Submission
 
 
 @pytest.fixture
-def submission():
-    return Submission()
+def mock_client_session():
+    mock_session = AsyncMock()
+    mock_response = AsyncMock()
+    mock_response.text.return_value = "mocked"
+    mock_session.post.return_value.__aenter__.return_value = mock_response
+    return mock_session
+
+
+@pytest.fixture
+def submission(mock_client_session):
+
+    return Submission(mock_client_session)
 
 
 @pytest.fixture

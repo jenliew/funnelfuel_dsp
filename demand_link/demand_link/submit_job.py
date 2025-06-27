@@ -16,9 +16,12 @@ logger = logging.getLogger(__name__)
 
 class Submission:
     def __init__(
-        self, dsp_endpoint=DEFAULT_URL_API_STR, rate_limit=DEFAULT_RATE_LIMIT
+        self,
+        session,
+        dsp_endpoint=DEFAULT_URL_API_STR,
+        rate_limit=DEFAULT_RATE_LIMIT,
     ) -> None:
-        self.notifier = Notifier(dsp_endpoint, rate_limit)
+        self.notifier = Notifier(session, dsp_endpoint, rate_limit)
 
     async def process_campaign_job(self, job):
         campaign_response = await self.notifier.post_entity(
@@ -30,12 +33,12 @@ class Submission:
             raise SubmissionError("Fail get campaign_id")
 
         if not await self.notifier.poll_status("campaigns", campaign_id):
-            raise SubmissionError("Fail pool status from DSP API")
+            raise SubmissionError("Fail poll status from DSP API")
             # TODO: need to handle this scenario
 
         for group in job.ad_groups:
             # Overwrite campaign_id return by DSP API
-            group.campaing_id = campaign_id
+            group.campaign_id = campaign_id
             await self._submit_ad_group(group)
 
     async def _submit_ad_group(self, group_data: AdGroup):
@@ -62,13 +65,14 @@ class Submission:
             raise SubmissionError("Failed to create/update ad.")
 
         if not await self.notifier.poll_status("ads", ad_id):
-            return SubmissionError("Fail pool status from DSP API")
+            raise SubmissionError("Fail pool status from DSP API")
 
     async def submit_job(self, queue: asyncio.Queue):
         logger.info("🚀 Starting DSP job submissions")
 
         while True:
             job = await queue.get()
+
             try:
                 logger.info("🛠️ Processing campaign job...")
                 await self.process_campaign_job(job)
@@ -88,7 +92,8 @@ class Submission:
                     logger.info(
                         f"🔁 Attempting retry {job.retries} for job {job.id}"
                     )
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(2**job.retries)
+
                     await queue.put(job)
                     queue.task_done()  # mark current attempt as complete
             else:
