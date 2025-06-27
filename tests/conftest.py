@@ -15,44 +15,36 @@ def queue():
     return asyncio.Queue()
 
 
-class MockAd:
-    def __init__(self, id="ad_001", type="banner"):
-        self.id = id
-        self.type = type
-        self.creative_url = "http://creative"
-        self.click_url = "http://click"
-        self.status = "pending"
-
-    def dict(self):
-        return self.__dict__
-
-
-class MockAdGroup:
-    def __init__(self, id="ag_001"):
-        self.id = id
-        self.name = "Ad Group Test"
-        self.bid = 2.5
-        self.targeting = {
-            "ages": "18-24;25-34",
-            "interests": "fashion;shoes",
-            "geo": "UK;IE",
-        }
-        self.ads = [MockAd()]
-
-    def dict(self):
-        return self.__dict__
+@pytest.fixture
+def test_campaign_dict():
+    return {
+        "campaign_id": "cmp_2025_004",
+        "campaign_name": "Autumn Styles 2024",
+        "campaign_budget": 21000,
+        "start_date": "2024-09-01",
+        "end_date": "2024-10-15",
+        "objective": "video_views",
+    }
 
 
-class MockCampaignJob:
-    def __init__(self):
-        self.id = "cmp_001"
-        self.name = "Campaign Test"
-        self.budget = 15000
-        self.start_date = "2025-07-01"
-        self.end_date = "2025-08-15"
-        self.objective = "engagement"
-        self.ad_groups = [MockAdGroup()]
-        self.retries = 0
-
-    def dict(self):
-        return self.__dict__
+@pytest.fixture
+def ad_groups_dict():
+    return {
+        "id": "test_ag_1001",
+        "name": "Adults - Test",
+        "bid": 2.0,
+        "targeting_ages": "35-44;45-64",
+        "targeting_interests": "fashion;streetwear",
+        "targeting_geo": "UK;IE",
+        "ads": [
+            {
+                "id": "ad_test_6001",
+                "type": "video",
+                "creative_url": (
+                    "https://cdn.test.com/creatives" "/autumn_style_city.jpg"
+                ),
+                "click_url": ("https://shop.test.com/city-autumn"),
+                "status": "new",
+            }
+        ],
+    }
