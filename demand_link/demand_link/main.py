@@ -78,7 +78,7 @@ def main():
 
     if record.campaign_record:
         operator_worker = WorkerManager(
-            record.campaign_record, args.dsp, args.rate_limit, args.worker
+            record.campaign_record, args.endpoint, args.rate_limit, args.worker
         )
 
         asyncio.run(operator_worker.start())
@@ -110,7 +110,7 @@ def intialise_scripts():
         default=DEFAULT_RATE_LIMIT,
     )
     parser.add_argument(
-        "--dsp",
+        "--endpoint",
         type=str,
         help="The URL of the DSP API endpoint.",
         default=DEFAULT_URL_API_STR,

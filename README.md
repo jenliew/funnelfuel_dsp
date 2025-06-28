@@ -77,3 +77,49 @@ python scripts/generate_test_csv.py
 ```
 pytest -s
 ```
+
+The script does have the option to change some of the parameters:
+```
+~/funnel_fuel$ /home/jenny/funnel_fuel/.venv/bin/python /home/jenny/funnel_fuel/demand_link/demand_link/main.py --help
+usage: main.py [-h] [--log {DEBUG,INFO,WARNING,ERROR,CRITICAL}] (--line LINE | --file FILE)
+               [--rate-limit RATE_LIMIT] [--endpoint ENDPOINT] [--worker WORKER]
+
+Submission Campaign data
+
+options:
+  -h, --help            show this help message and exit
+  --log {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Enabled logging
+  --line LINE           Dict of campaign data to process
+  --file FILE           Full path for the CSV file of campaign data
+  --rate-limit RATE_LIMIT
+                        Rate Limit to restrict the request limit to the DSP Endpoint
+  --endpoint ENDPOINT             The URL of the DSP API endpoint.
+  --worker WORKER       The number of worker to the queue..
+```
+
+
+## Improve/Extension feature
+This script is a protype where start from the basic and minimum requirements. It can be easily extend the functinalities:
+* Support DSP API require API credential/token to make the request. This can be easily done by create the AuthBasic object by adding the username and password/construct the header with the API token in ```Notifier```.
+```
+        self.auth_dsp = None  # This is to authaiohttp.BasicAuth
+        ## eg: self.auth_dsp = authaiohttp.BasicAuth(user, password)
+        ## or
+        self.api_header = None  # This is for API key.
+        ## eg: self.api_header = {"Authorization": "Bearer MYREALLYLONGTOKENIGOT"}
+
+```
+    depends on the DSP API endpoint support which type of credential, it should able to easily to adding this feature.
+* Once the submission job completed, there's a ```complete_task(...)``` in the Submission class. THis can be used for insert the job into the campaign data to a database or update the status to an endpoint.
+```
+async def complete_task(self, is_success, job_id):
+```
+
+* Error code of the demand_link script interaction with the DSP API endpoint. There is more error code need to add into it and handle.
+
+Below is the high level for the systems. The DB service can be easily to setup as soon have more information about final part of the assignment.
+*Note: the yellow components are the future works.
+![alt text](misc/future_work_image.png)
+
+The logging of the application can be easily to push to the Datadog, there's datadog agent be can handling the pushing the logs to the Datadog when the script is being running. (https://docs.datadoghq.com/logs/log_collection/python/)
