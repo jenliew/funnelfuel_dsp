@@ -9,7 +9,7 @@ from demand_link.demand_link.utils import split_jobs
 logger = logging.getLogger(__name__)
 
 
-class OperationWorker:
+class WorkerManager:
     def __init__(
         self, jobs: List, endpoint: str, rate_limit: int, worker_num: int
     ):

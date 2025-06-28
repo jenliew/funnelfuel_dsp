@@ -12,7 +12,7 @@ from demand_link.demand_link.constant import (
     DEFAULT_WORKER_NUM,
 )
 from demand_link.demand_link.exception import SubmissionError
-from demand_link.demand_link.operational import OperationWorker
+from demand_link.demand_link.operational import WorkerManager
 from demand_link.demand_link.record import Record
 from demand_link.demand_link.utils import (
     convert_str_dsp_record,
@@ -77,7 +77,7 @@ def main():
     )
 
     if record.campaign_record:
-        operator_worker = OperationWorker(
+        operator_worker = WorkerManager(
             record.campaign_record, args.dsp, args.rate_limit, args.worker
         )
 
