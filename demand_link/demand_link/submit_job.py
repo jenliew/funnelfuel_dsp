@@ -33,6 +33,8 @@ class Submission:
             self.notifier = Notifier(
                 self.session, self.endpoint, self.rate_limit
             )
+        else:
+            logger.info("Re-using existing session.")
 
     async def process_campaign_job(self, job):
 
@@ -101,11 +103,10 @@ class Submission:
             job = await queue.get()
 
             if not job and queue.empty():
-                if self.session and not self.session.closed:
-                    await self.session.close()
                 logger.info(f"Queue is empty. Breaking the loop. job:{job}")
                 queue.task_done()
                 break
+
             try:
                 logger.info(f"Processing campaign job: {job}")
                 await self.process_campaign_job(job)
@@ -118,6 +119,15 @@ class Submission:
                 )
                 queue.task_done()
                 await self.complete_task(True, job.id)
+
+        logger.info("Queue worker is completed. closing down gracefully.")
+        if self.session and not self.session.closed:
+            await self.session.close()
+            del self.session
+            del self.notifier
+            self.session = None
+            self.notifier = None
+            logger.debug("As par of clean up, close off the session. ")
 
     async def _handle_failed_job(self, job, queue: asyncio.Queue):
 
