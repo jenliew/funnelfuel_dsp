@@ -20,14 +20,20 @@ logger = logging.getLogger(__name__)
 class Notifier:
     def __init__(
         self,
-        session,
-        endpoint=DEFAULT_URL_API_STR,
-        rate_limit=DEFAULT_RATE_LIMIT,
+        session: aiohttp.ClientSession,
+        endpoint: str = DEFAULT_URL_API_STR,
+        rate_limit: int = DEFAULT_RATE_LIMIT,
     ) -> None:
         self.api_url = f"http://{endpoint}"
         self.rate_limiter = AsyncLimiter(rate_limit, 60)
 
         self._http_session = session
+        if not self._http_session:
+            logger.warning("ClientSession (self._http_session) is null.")
+
+        self.auth_dsp = None  # This is to authaiohttp.BasicAuth (if need to)
+
+        self.api_header = None  # This is for API key.
 
     async def request_with_limiter(
         self, method: API_REQUEST, url: str, **kwargs
@@ -42,11 +48,20 @@ class Notifier:
                 )
                 async with api_method(
                     url,
+                    headers=None if not self.api_header else self.api_header,
+                    auth=(
+                        self.auth_dsp if not self.auth_dsp else self.auth_dsp
+                    ),
                     **kwargs,
                 ) as response:
                     logger.debug(f"Response received:{response.status}")
                     text = await response.text()
                     logger.info(f"Raw response from {url}: {text}")
+
+                    # TODO:
+                    # Can be check the return code, if the endpoint require
+                    # API key/authentication. Possible need to retries
+                    # and re-request to the endpoint.
                     return json.loads(text)
 
             except aiohttp.ClientResponseError as e:
@@ -69,11 +84,11 @@ class Notifier:
                 raise SubmissionError(f"Unexpected error: {e}")
 
     async def poll_status(self, entity_type: str, entity_id: str):
+        retries = 0
+        url = f"{self.api_url}/{entity_type}/{entity_id}/status"
 
-        try:
-            retries = 0
-            url = f"{self.api_url}/{entity_type}/{entity_id}/status"
-            while retries <= MAX_RETRIES_POLL:
+        while retries <= MAX_RETRIES_POLL:
+            try:
                 data = await self.request_with_limiter(API_REQUEST.GET, url)
                 if data:
                     status = data.get("status", None)
@@ -94,15 +109,19 @@ class Notifier:
                 retries += 1
                 await asyncio.sleep(2)
 
-        except aiohttp.ServerTimeoutError as e:
-            raise SubmissionError(f"DSP Server connection timeout:{e}")
-        except aiohttp.ClientConnectionError as e:
-            raise SubmissionError(f"ClientConnection exception: {e}")
+            except aiohttp.ServerTimeoutError as e:
+                raise SubmissionError(f"DSP Server connection timeout:{e}")
+            except aiohttp.ClientConnectionError as e:
+                raise SubmissionError(f"ClientConnection exception: {e}")
 
     async def post_entity(self, entity_type: str, data: Dict):
         try:
             url = f"{self.api_url}/{entity_type}"
 
+            # At this moment, it will pass in a standard Dict json
+            # format to make the request.
+            # This is where possible package the format of the data
+            # according to the endpoint API.
             return await self.request_with_limiter(
                 API_REQUEST.POST, url, json=data
             )

@@ -16,9 +16,11 @@ def mock_client_session():
 
 
 @pytest.fixture
-def submission(mock_client_session):
+def submission(mock_client_session, monkeypatch):
 
-    return Submission(mock_client_session)
+    submission_mock = Submission()
+
+    return submission_mock
 
 
 @pytest.fixture

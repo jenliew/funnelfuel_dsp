@@ -50,3 +50,20 @@ def convert_str_dsp_record(record, input_data):
         )
 
     return
+
+
+def split_jobs(jobs, num_parts):
+    total_jobs = len(jobs)
+    avg_chunk_size = total_jobs // num_parts
+    job_splits = []
+
+    # First (num_parts - 1) chunks with size avg_chunk_size
+    for i in range(num_parts - 1):
+        start = i * avg_chunk_size
+        end = (i + 1) * avg_chunk_size
+        job_splits.append(jobs[start:end])
+
+    # Last chunk includes the remaining jobs
+    job_splits.append(jobs[(num_parts - 1) * avg_chunk_size :])
+
+    return job_splits

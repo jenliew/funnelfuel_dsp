@@ -60,8 +60,13 @@ class AsyncMock(mock.MagicMock):
 
 @pytest.mark.asyncio
 async def test_successful_job(
-    submission, monkeypatch: MonkeyPatch, queue: asyncio.Queue
+    submission,
+    mock_client_session,
+    monkeypatch: MonkeyPatch,
+    queue: asyncio.Queue,
 ):
+
+    await submission.setup_session()
 
     submission.notifier.post_entity = AsyncMock(
         side_effect=[
@@ -76,8 +81,6 @@ async def test_successful_job(
     task = asyncio.create_task(submission.submit_job(queue))
     await queue.join()
     task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
 
 
 @pytest.mark.asyncio
@@ -85,6 +88,7 @@ async def test_campaign_creation_failure(
     submission: Submission, monkeypatch: MonkeyPatch, queue: asyncio.Queue
 ):
     monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 1)
+    await submission.setup_session()
 
     submission.notifier.post_entity = AsyncMock(
         side_effect=[{"campaign_id": None}, {"campaign_id": None}]
@@ -96,9 +100,6 @@ async def test_campaign_creation_failure(
     await queue.join()
     task.cancel()
 
-    with pytest.raises(asyncio.CancelledError):
-        await task
-
     assert submission.notifier.poll_status.call_count == 0
 
 
@@ -107,6 +108,7 @@ async def test_campaign_poll_failure(
     submission: Submission, monkeypatch: MonkeyPatch, queue: asyncio.Queue
 ):
     monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 0)
+    await submission.setup_session()
 
     submission.notifier.post_entity = AsyncMock(
         side_effect=[{"campaign_id": "camp_123"}]
@@ -114,9 +116,8 @@ async def test_campaign_poll_failure(
     submission.notifier.poll_status = AsyncMock(side_effect=[False])
     await queue.put(MockCampaignJob())
 
-    task = asyncio.create_task(submission.submit_job(queue))
+    asyncio.create_task(submission.submit_job(queue))
     await queue.join()
-    task.cancel()
 
     assert submission.notifier.poll_status.call_count == 1
 
@@ -126,7 +127,7 @@ async def test_ad_group_creation_failure(
     submission, monkeypatch, queue: asyncio.Queue
 ):
     monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 1)
-    await asyncio.sleep(10)
+    await submission.setup_session()
     submission.notifier.post_entity = AsyncMock(
         side_effect=[
             {"campaign_id": "camp_123"},
@@ -138,11 +139,8 @@ async def test_ad_group_creation_failure(
     submission.notifier.poll_status = AsyncMock(side_effect=[True, False])
     await queue.put(MockCampaignJob())
 
-    task = asyncio.create_task(submission.submit_job(queue))
+    asyncio.create_task(submission.submit_job(queue))
     await queue.join()
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
 
     assert submission.notifier.poll_status.call_count == 2
 
@@ -150,6 +148,7 @@ async def test_ad_group_creation_failure(
 @pytest.mark.asyncio
 async def test_ad_poll_failure(submission, monkeypatch, queue: asyncio.Queue):
     monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 1)
+    await submission.setup_session()
 
     submission.notifier.post_entity = AsyncMock(
         side_effect=[
@@ -169,9 +168,8 @@ async def test_ad_poll_failure(submission, monkeypatch, queue: asyncio.Queue):
     )
     await queue.put(MockCampaignJob())
 
-    task = asyncio.create_task(submission.submit_job(queue))
+    asyncio.create_task(submission.submit_job(queue))
     await queue.join()
-    task.cancel()
 
     assert submission.notifier.poll_status.call_count == 5
 
@@ -181,6 +179,8 @@ async def test_ad_id_missing(
     submission: Submission, monkeypatch: MonkeyPatch, queue: asyncio.Queue
 ):
     monkeypatch.setattr("demand_link.demand_link.submit_job.MAX_RETRIES", 0)
+    await submission.setup_session()
+
     submission.notifier.post_entity = AsyncMock(
         side_effect=[
             {"campaign_id": "camp_123"},
@@ -193,11 +193,8 @@ async def test_ad_id_missing(
     )
     await queue.put(MockCampaignJob())
 
-    task = asyncio.create_task(submission.submit_job(queue))
+    asyncio.create_task(submission.submit_job(queue))
     await queue.join()
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
 
 
 @pytest.mark.asyncio
@@ -212,16 +209,13 @@ async def test_retries_failure(
         {"ad_group_id": "group_456"},
         {"ad_id": "ad_789"},
     ]
+    await submission.setup_session()
 
     submission.notifier.post_entity = AsyncMock(side_effect=responses)
     submission.notifier.poll_status = AsyncMock(side_effect=response_status)
 
     await queue.put(MockCampaignJob())
-    task = asyncio.create_task(submission.submit_job(queue))
+    asyncio.create_task(submission.submit_job(queue))
     await queue.join()
-    task.cancel()
-
-    with pytest.raises(asyncio.CancelledError):
-        await task
 
     assert submission.notifier.poll_status.call_count == 4

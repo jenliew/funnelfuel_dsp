@@ -3,50 +3,75 @@ import asyncio
 import json
 import logging
 import os
+import threading
 import traceback
-from asyncio import Queue
 from csv import DictReader
-
-import aiohttp
 
 from demand_link.demand_link.constant import (
     DEFAULT_RATE_LIMIT,
     DEFAULT_URL_API_STR,
     DEFAULT_WORKER_NUM,
-    HTTP_TIMEOUT,
 )
 from demand_link.demand_link.exception import SubmissionError
 from demand_link.demand_link.record import Record
 from demand_link.demand_link.submit_job import Submission
 from demand_link.demand_link.utils import (
     convert_str_dsp_record,
+    split_jobs,
 )
 
 
-async def parse_campaign_job(list_campaign, endpoint, rate_limit, worker_num):
-    queue = Queue()
-    for campaign in list_campaign:
-        await queue.put(campaign)
+async def submission_worker(jobs_list, endpoint, rate_limit):
+    queue = asyncio.Queue()
+    # THis is indicate the last message for the worker
+    # to exit the For loop.
+    jobs_list.append(None)
+    for job in jobs_list:
+        await queue.put(job)
 
-    logging.info("Creating session.")
-    client_timeout = aiohttp.ClientTimeout(
-        total=None, sock_connect=HTTP_TIMEOUT, sock_read=HTTP_TIMEOUT
-    )
-    async with aiohttp.ClientSession(timeout=client_timeout) as session:
+    submission = Submission(dsp_endpoint=endpoint, rate_limit=rate_limit)
 
-        job_submission = Submission(
-            session, dsp_endpoint=endpoint, rate_limit=rate_limit
-        )
-
-        workers = [
-            asyncio.create_task(job_submission.submit_job(queue))
-            for _ in range(worker_num)
-        ]  # worker_num workers
-
+    logging.info("Starting async submission worker...")
+    try:
+        await submission.submit_job(queue)
         await queue.join()
+    finally:
+        logging.info("Worker completed cleanup.")
 
-        for w in workers:
-            w.cancel()
+
+def run_submission_worker(jobs_list, thread_id, endpoint, rate_limit):
+
+    loop = None
+    logging.info(f"-> Worker job: {jobs_list}")
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(
+            submission_worker(jobs_list, endpoint, rate_limit)
+        )
+    except Exception as e:
+        logging.error(f"[Thread-{thread_id}] Worker crashed: {e}")
+    finally:
+        if loop:
+            loop.close()
+            logging.info(f"[Thread-{thread_id}] Worker stopped.")
+
+
+async def parse_campaign_job(list_campaign, endpoint, rate_limit, worker_num):
+
+    threads = []
+    pre_job_list = split_jobs(list_campaign, worker_num)
+
+    for i in range(worker_num):
+        t = threading.Thread(
+            target=run_submission_worker,
+            args=(pre_job_list[i], i, endpoint, rate_limit),
+        )
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
 
 
 def configure_logging(log_level: str):
