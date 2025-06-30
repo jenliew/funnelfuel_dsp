@@ -17,37 +17,81 @@ This is the project to the FunnelFuel challenge. It demostrates an integration s
 | Theards | Python threading |
 | Testing | pytest |
 
+## High-Level Architecture
+
 This the high level of the demmand_link component architecture.
+
 ![alt text](misc/image.png)
 
 ## How it works:
-1. The python script support loading CSV file or process one campaign data (in dict format).
-    * Loading CSV file
-        it will load each lines of the data from the CSV file. The data will be process and convert each campagain as a "Record" object, as it processing each line of campagin data, it will group the *ad_groups* and *ads* to any existing *campaign* before create a new entry.
-    * Loading single line (dict format)
-        It will convert the dict into the *Record* object.
+1. The Python script supports loading either:
+   - A **CSV file**
+   - A **single campaign record** in dictionary format, eg:
+   ```
+   {
+    "campaign_id": "cmp_2025_004",
+    "campaign_name": "Autumn Styles 2024",
+    "campaign_budget": 21000,
+    "start_date": "2024-09-01",
+    "end_date": "2024-10-15",
+    "objective": "video_views",
+    "ad_groups": [
+        {
+            "id": "ag_1003",
+            "name": "Adults - City",
+            "bid": 4.0,
+            "targeting_ages": "35-44;45-64",
+            "targeting_interests": "fashion;streetwear",
+            "targeting_geo": "UK;IE",
+            "ads": [
+                {
+                    "id": "ad_6001",
+                    "type": "video",
+                    "creative_url": (
+                        "https://cdn.example.com/creatives"
+                        "/autumn_style_city.jpg"
+                    ),
+                    "click_url": "https://shop.example.com/city-autumn",
+                    "status": "new",
+                }
+            ],
+        }
+    ],
+    }
+   ```
 
-2. Once the list of *Record* object successfully created, jobs will be divided across N worker threads (default is 3 worker threads but configurable via the argument)
-3. Each thread  runs its own asyncio envent loop, ```aiohttp.ClientSession``` and has it owns Queue.
-4. Each job is processed by making DSP API endpoint:
-    * ``` POST /campaigns ```
-    * ``` GET /campaigns/<id>/status ``` and wait for the response from the DSP server. If the status returns:
-        - ``` { "status": "success" }``` - this means successfully create campaign data
-        - ``` { "status": "failed" } ``` - this means failed to create campaign data. It will raise exception and try again for 3 attempts before process next campaign data.
-    * ``` POST /ad-groups ``` and wait for the response.
-        - A successful request, it will expecting the reply will contain the *ad-groups-id" key in the dict response.
-        - If not, it will assume the post request is failed and raise exeception.
-    * ``` GET /ad-groups/<id>/status ``` and wait for the response from the DSP server. If the status returns:
-        - ``` { "status": "success" }``` - this means successfully create campaign data
-        - ``` { "status": "failed" } ``` - this means failed to create campaign data.
-    * ``` POST /ads ``` and wait for the response.
-        - A successful resquest, it will expecting the reply will contain the *ads-id" key in the dict response.
-        - If not, it will assume the post request is failed and raise exeception.
-    * ``` GET /ads/<id>/status ``` and wait for the response from the DSP server. If the status returns:
-        - ``` { "status": "success" }``` - this means successfully create campaign data
-        - ``` { "status": "failed" } ``` - this means failed to create campaign data.
-5. All requests are rate-limited (40 requests/min) using ```AsyncLimiter```.
-6. Any failed request or jobs, they will be retired up to ```MAX_RETRIES``.
+   ### a. **Loading CSV File**
+   Each line in the CSV is parsed into a `Record` object. As the script processes each row, it groups related `ad_groups` and `ads` under the corresponding campaign, or creates a new campaign entry if one doesn't exist.
+
+   ### b. **Loading a Single Record (Dict Format)**
+   The dictionary is directly converted into a `Record` object.
+
+2. Once a list of `Record` objects is created, the jobs are divided across N worker threads (default: 3; configurable via `--worker`).
+
+3. Each thread runs its own `asyncio` event loop, owns a `ClientSession`, and maintains an independent queue.
+
+4. Each job follows this DSP submission sequence:
+   - `POST /campaigns`
+   - `GET /campaigns/<id>/status`
+     Waits for a response:
+     - `{ "status": "success" }` → campaign was created successfully
+     - `{ "status": "failed" }` → campaign creation failed; retry up to 3 times before skipping
+   - `POST /ad-groups`
+     - Expects response to contain an `ad_group_id`
+     - If missing, raises an exception
+   - `GET /ad-groups/<id>/status`
+     - Follows same success/failure handling as above
+   - `POST /ads`
+     - Expects response to contain an `ad_id`
+     - If missing, raises an exception
+   - `GET /ads/<id>/status`
+     - Verifies the ad status
+
+5. All requests are rate-limited using `AsyncLimiter` (40 requests per minute).
+
+6. Failed jobs are retried up to `MAX_RETRIES`.
+
+---
 
 
 ## Running the project
@@ -101,27 +145,64 @@ options:
 ```
 
 
-## Improve/Extension feature
-This script is a protype where start from the basic and minimum requirements. It can be easily extend the functinalities:
-* Support DSP API require API credential/token to make the request. This can be easily done by create the AuthBasic object by adding the username and password/construct the header with the API token in ```Notifier```.
-```
-        self.auth_dsp = None  # This is to authaiohttp.BasicAuth
-        ## eg: self.auth_dsp = authaiohttp.BasicAuth(user, password)
-        ## or
-        self.api_header = None  # This is for API key.
-        ## eg: self.api_header = {"Authorization": "Bearer MYREALLYLONGTOKENIGOT"}
+## Extension & Improvements
 
-```
-    depends on the DSP API endpoint support which type of credential, it should able to easily to adding this feature.
-* Once the submission job completed, there's a ```complete_task(...)``` in the Submission class. THis can be used for insert the job into the campaign data to a database or update the status to an endpoint.
-```
-async def complete_task(self, is_success, job_id):
-```
+This is a working prototype with extensible architecture. Potential improvements:
 
-* Error code of the demand_link script interaction with the DSP API endpoint. There is more error code need to add into it and handle.
+- **Authentication Support**
+  Easily add support for API tokens or Basic Auth in the `Notifier`:
+  ```python
+  self.auth_dsp = aiohttp.BasicAuth(user, password)
+  self.api_header = {"Authorization": "Bearer <API_KEY>"}
+  ```
 
-Below is the high level for the systems. The DB service can be easily to setup as soon have more information about final part of the assignment.
-*Note: the yellow components are the future works.
+- **Finalization Hook**
+  After submission, the `complete_task(...)` method can:
+  - Save job status to a DB
+  - Report to an external system
+
+  ```python
+  async def complete_task(self, is_success, job_id):
+      ...
+  ```
+
+- **Error Handling Enhancements**
+  More granular handling for DSP error codes and timeouts can be added.
+
+---
+
+## 📈 Future Architecture
+
+Here’s a high-level diagram for future system enhancements.
+🟡 Yellow components are planned/optional:
+
 ![alt text](misc/future_work_image.png)
 
-The logging of the application can be easily to push to the Datadog, there's datadog agent be can handling the pushing the logs to the Datadog when the script is being running. (https://docs.datadoghq.com/logs/log_collection/python/)
+---
+
+## Logging
+
+Application logs can be sent to Datadog using the [Datadog Python logging integration](https://docs.datadoghq.com/logs/log_collection/python/). A Datadog agent can forward logs automatically while the script is running.
+
+## Challenges Encountered
+
+- **Rate-limiting across threads**
+  Ensuring that all threads respect a shared global rate limit (40 requests/min) required careful separation of `AsyncLimiter` instances per thread.
+
+- **Asyncio event loops in threads**
+  Each worker thread needed its own event loop. Mixing `asyncio.Queue` across threads caused runtime errors, so per-thread queues were used.
+
+- **Dependency ordering**
+  Campaigns, ad groups, and ads must be submitted in order, with polling after each step. This required designing a job orchestration flow with validation gates.
+
+- **Graceful shutdown**
+  Long-running `while True` loops had to be broken cleanly using sentinel values (`"STOP"`) and task tracking with `queue.task_done()`.
+
+- **Testability of aiohttp**
+  To unit test HTTP flows, `aiohttp.ClientSession` was injected and manually closed using `async with` patterns to allow mocking in `pytest-asyncio`.
+
+- **Input data structure format and source input**
+  Designing the mock structure of campaign data for testing involved making assumptions and conducting research on expected DSP formats, due to the lack of a formal specification.
+
+
+---

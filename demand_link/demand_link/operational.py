@@ -59,7 +59,7 @@ class WorkerManager:
         queue = asyncio.Queue()
 
         # Use sentinel to signal shutdown
-        jobs_list.append(None)
+        jobs_list.append("STOP")
         for job in jobs_list:
             await queue.put(job)
 

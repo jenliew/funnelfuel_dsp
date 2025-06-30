@@ -102,7 +102,7 @@ class Submission:
         while True:
             job = await queue.get()
 
-            if not job and queue.empty():
+            if job == "STOP":
                 logger.info(f"Queue is empty. Breaking the loop. job:{job}")
                 queue.task_done()
                 break
